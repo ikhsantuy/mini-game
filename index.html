@@ -6,38 +6,54 @@
   <style>
     body {
       margin: 0; display: flex; justify-content: center; align-items: center;
-      height: 100vh; background: #eef2ff; font-family: sans-serif;
+      height: 100vh; background: linear-gradient(to top, #87cefa, #e0f7fa);
+      font-family: sans-serif;
     }
     #menu, #game, #overlay, #final {
       display: none; flex-direction: column; align-items: center; justify-content: center;
     }
     #menu { display: flex; }
     h1 {
-      font-size: 32px; color: #333; margin-bottom: 10px;
+      font-size: 34px; color: #222; margin-bottom: 8px;
     }
-    h2 {
-      margin: 5px 0 15px; font-weight: normal; color: #555;
-    }
+    h2 { margin: 0 0 15px; font-weight: normal; color: #444; }
     #game {
-      position: relative; width: 700px; height: 250px;
-      background: #fff; border: 2px solid #444; overflow: hidden;
+      position: relative; width: 700px; height: 300px;
+      background: #cce5ff; border: 3px solid #333; overflow: hidden;
+    }
+    #ground {
+      position: absolute; bottom: 0; width: 100%; height: 60px;
+      background: #4caf50;
     }
     #player {
-      position: absolute; bottom: 0; left: 50px;
-      width: 30px; height: 30px; background: dodgerblue;
+      position: absolute; bottom: 60px; left: 50px;
+      width: 35px; height: 35px; background: dodgerblue;
+      border-radius: 6px; box-shadow: 0 3px 5px rgba(0,0,0,0.3);
+    }
+    .shadow {
+      position: absolute; bottom: 55px; left: 50px;
+      width: 35px; height: 5px; border-radius: 50%;
+      background: rgba(0,0,0,0.3);
     }
     .obstacle {
-      position: absolute; bottom: 0;
-      width: 20px; height: 40px; background: tomato;
+      position: absolute; bottom: 60px;
+      width: 25px; height: 45px; background: tomato;
+      border-radius: 4px;
+    }
+    .cloud {
+      position: absolute; top: 30px; width: 60px; height: 30px;
+      background: white; border-radius: 50%;
+      box-shadow: 20px 10px 0 white, 40px 0 0 white;
+      opacity: 0.8;
     }
     #scoreboard {
       position: absolute; top: 5px; left: 5px;
-      font-size: 14px; font-weight: bold;
+      font-size: 14px; font-weight: bold; color: #222;
     }
     #overlay, #final {
-      position: absolute; inset: 0; background: rgba(0,0,0,0.5);
+      position: absolute; inset: 0; background: rgba(0,0,0,0.6);
       display: none; flex-direction: column; align-items: center; justify-content: center;
-      color: white; font-size: 20px;
+      color: white; font-size: 22px;
     }
     button {
       margin-top: 10px; padding: 6px 12px; font-size: 16px;
@@ -45,6 +61,14 @@
     }
     input {
       padding: 6px; margin: 5px; border: 1px solid #aaa; border-radius: 6px;
+    }
+    .score-pop {
+      position: absolute; color: gold; font-weight: bold;
+      animation: pop 0.7s ease-out forwards;
+    }
+    @keyframes pop {
+      0% { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(-25px); }
     }
   </style>
 </head>
@@ -60,13 +84,17 @@
 
   <!-- Game -->
   <div id="game">
+    <div class="cloud" style="left:150px"></div>
+    <div class="cloud" style="left:400px; top:60px"></div>
     <div id="player"></div>
+    <div class="shadow"></div>
+    <div id="ground"></div>
     <div id="scoreboard">
       Giliran: <span id="turnName"></span> |
       Skor: <span id="currentScore">0</span>
     </div>
     <div id="overlay">
-      <div id="gameover-text">Game Over!</div>
+      <div id="gameover-text">💥 Game Over!</div>
       <button id="next">Giliran Berikutnya</button>
     </div>
     <div id="final">
@@ -82,6 +110,7 @@
     const startBtn = document.getElementById("startGame");
     const game = document.getElementById("game");
     const player = document.getElementById("player");
+    const shadow = document.querySelector(".shadow");
     const turnNameEl = document.getElementById("turnName");
     const currentScoreEl = document.getElementById("currentScore");
     const overlay = document.getElementById("overlay");
@@ -89,15 +118,9 @@
     const final = document.getElementById("final");
     const winnerEl = document.getElementById("winner");
 
-    let players = [];
-    let scores = [];
-    let currentPlayer = 0;
-    let jump = false;
-    let y = 0;
-    let score = 0;
-    let obstacles = [];
-    let speed = 5;
-    let alive = true;
+    let players = [], scores = [], currentPlayer = 0;
+    let jump = false, y = 0, score = 0;
+    let obstacles = [], speed = 5, alive = true;
 
     // Tambah input pemain
     addPlayerBtn.onclick = () => {
@@ -105,25 +128,15 @@
       inp.placeholder = "Nama pemain";
       inputsDiv.appendChild(inp);
     };
+    addPlayerBtn.click(); addPlayerBtn.click(); // default 2
 
-    // Default 2 pemain
-    addPlayerBtn.click();
-    addPlayerBtn.click();
-
-    // Mulai game setelah registrasi
     startBtn.onclick = () => {
       const inputs = inputsDiv.querySelectorAll("input");
       players = [];
-      inputs.forEach(inp => {
-        if (inp.value.trim() !== "") players.push(inp.value.trim());
-      });
-      if (players.length < 2) {
-        alert("Minimal 2 pemain!");
-        return;
-      }
+      inputs.forEach(inp => { if (inp.value.trim() !== "") players.push(inp.value.trim()); });
+      if (players.length < 2) return alert("Minimal 2 pemain!");
       scores = new Array(players.length).fill(0);
-      menu.style.display = "none";
-      game.style.display = "flex";
+      menu.style.display = "none"; game.style.display = "flex";
       startTurn();
     };
 
@@ -134,11 +147,8 @@
     nextBtn.onclick = () => {
       scores[currentPlayer] = score;
       currentPlayer++;
-      if (currentPlayer < players.length) {
-        startTurn();
-      } else {
-        showFinal();
-      }
+      if (currentPlayer < players.length) startTurn();
+      else showFinal();
     };
 
     function startTurn() {
@@ -148,61 +158,55 @@
     }
 
     function resetGame() {
-      obstacles.forEach(o => o.remove());
-      obstacles = [];
-      score = 0;
-      y = 0;
-      player.style.bottom = "0px";
-      speed = 5;
-      alive = true;
-      overlay.style.display = "none";
-      final.style.display = "none";
+      obstacles.forEach(o => o.remove()); obstacles = [];
+      score = 0; y = 0; player.style.bottom = "60px";
+      speed = 5; alive = true; overlay.style.display = "none";
       requestAnimationFrame(gameLoop);
     }
 
     function gameLoop() {
-      if (!alive) {
-        overlay.style.display = "flex";
-        return;
-      }
+      if (!alive) { overlay.style.display = "flex"; return; }
 
-      if (jump) { y += 5; if (y >= 100) jump = false; }
-      else { if (y > 0) y -= 5; }
-      player.style.bottom = y + "px";
+      if (jump) { y += 6; if (y >= 120) jump = false; }
+      else if (y > 0) y -= 6;
+      player.style.bottom = (60 + y) + "px";
+      shadow.style.width = 35 - y*0.1 + "px";
 
       if (Math.random() < 0.02) {
         const obs = document.createElement("div");
         obs.className = "obstacle";
         obs.style.left = "700px";
-        game.appendChild(obs);
-        obstacles.push(obs);
+        game.appendChild(obs); obstacles.push(obs);
       }
 
       obstacles.forEach((obs, i) => {
         let x = parseInt(obs.style.left);
         obs.style.left = (x - speed) + "px";
-
-        if (x < 80 && x > 50 && y < 40) {
-          alive = false;
-        }
-
-        if (x < -20) {
-          obs.remove();
-          obstacles.splice(i, 1);
-          score++;
-          currentScoreEl.textContent = score;
+        if (x < 80 && x > 50 && y < 40) alive = false;
+        if (x < -30) {
+          obs.remove(); obstacles.splice(i, 1);
+          score++; currentScoreEl.textContent = score;
+          showScorePop();
         }
       });
 
       requestAnimationFrame(gameLoop);
     }
 
+    function showScorePop() {
+      const pop = document.createElement("div");
+      pop.className = "score-pop";
+      pop.style.left = "90px"; pop.style.bottom = (80 + y) + "px";
+      pop.textContent = "+1";
+      game.appendChild(pop);
+      setTimeout(()=>pop.remove(),700);
+    }
+
     function showFinal() {
       let maxScore = Math.max(...scores);
-      let winners = players.filter((p, i) => scores[i] === maxScore);
-      winnerEl.textContent = `🏆 Pemenang: ${winners.join(", ")} dengan skor ${maxScore}`;
-      overlay.style.display = "none";
-      final.style.display = "flex";
+      let winners = players.filter((p,i)=>scores[i]===maxScore);
+      winnerEl.textContent = `🏆 Pemenang: ${winners.join(", ")} (Skor ${maxScore})`;
+      overlay.style.display = "none"; final.style.display = "flex";
     }
   </script>
 </body>

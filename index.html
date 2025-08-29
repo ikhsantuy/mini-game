@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Mini Jump Multiplayer</title>
+  <style>
+    body {
+      margin: 0; display: flex; justify-content: center; align-items: center;
+      height: 100vh; background: #eef2ff; font-family: sans-serif;
+    }
+    #menu, #game, #overlay, #final {
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+    }
+    #menu { display: flex; }
+    #game {
+      position: relative; width: 700px; height: 250px;
+      background: #fff; border: 2px solid #444; overflow: hidden;
+    }
+    #player {
+      position: absolute; bottom: 0; left: 50px;
+      width: 30px; height: 30px; background: dodgerblue;
+    }
+    .obstacle {
+      position: absolute; bottom: 0;
+      width: 20px; height: 40px; background: tomato;
+    }
+    #scoreboard {
+      position: absolute; top: 5px; left: 5px;
+      font-size: 14px; font-weight: bold;
+    }
+    #overlay, #final {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.5);
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      color: white; font-size: 20px;
+    }
+    button {
+      margin-top: 10px; padding: 6px 12px; font-size: 16px;
+      border: none; border-radius: 6px; cursor: pointer;
+    }
+    input {
+      padding: 6px; margin: 5px; border: 1px solid #aaa; border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Menu Registrasi -->
+  <div id="menu">
+    <h2>Daftar Pemain</h2>
+    <div id="inputs"></div>
+    <button id="addPlayer">+ Tambah Pemain</button>
+    <button id="startGame">Mulai Game</button>
+  </div>
+
+  <!-- Game -->
+  <div id="game">
+    <div id="player"></div>
+    <div id="scoreboard">
+      Giliran: <span id="turnName"></span> |
+      Skor: <span id="currentScore">0</span>
+    </div>
+    <div id="overlay">
+      <div id="gameover-text">Game Over!</div>
+      <button id="next">Giliran Berikutnya</button>
+    </div>
+    <div id="final">
+      <div id="winner"></div>
+      <button onclick="location.reload()">Main Lagi</button>
+    </div>
+  </div>
+
+  <script>
+    const menu = document.getElementById("menu");
+    const inputsDiv = document.getElementById("inputs");
+    const addPlayerBtn = document.getElementById("addPlayer");
+    const startBtn = document.getElementById("startGame");
+    const game = document.getElementById("game");
+    const player = document.getElementById("player");
+    const turnNameEl = document.getElementById("turnName");
+    const currentScoreEl = document.getElementById("currentScore");
+    const overlay = document.getElementById("overlay");
+    const nextBtn = document.getElementById("next");
+    const final = document.getElementById("final");
+    const winnerEl = document.getElementById("winner");
+
+    let players = [];
+    let scores = [];
+    let currentPlayer = 0;
+    let jump = false;
+    let y = 0;
+    let score = 0;
+    let obstacles = [];
+    let speed = 5;
+    let alive = true;
+
+    // Tambah input pemain
+    addPlayerBtn.onclick = () => {
+      const inp = document.createElement("input");
+      inp.placeholder = "Nama pemain";
+      inputsDiv.appendChild(inp);
+    };
+
+    // Default 2 pemain
+    addPlayerBtn.click();
+    addPlayerBtn.click();
+
+    // Mulai game setelah registrasi
+    startBtn.onclick = () => {
+      const inputs = inputsDiv.querySelectorAll("input");
+      players = [];
+      inputs.forEach(inp => {
+        if (inp.value.trim() !== "") players.push(inp.value.trim());
+      });
+      if (players.length < 2) {
+        alert("Minimal 2 pemain!");
+        return;
+      }
+      scores = new Array(players.length).fill(0);
+      menu.style.display = "none";
+      game.style.display = "flex";
+      startTurn();
+    };
+
+    document.addEventListener("keydown", e => {
+      if (e.code === "Space" && alive) jump = true;
+    });
+
+    nextBtn.onclick = () => {
+      scores[currentPlayer] = score;
+      currentPlayer++;
+      if (currentPlayer < players.length) {
+        startTurn();
+      } else {
+        showFinal();
+      }
+    };
+
+    function startTurn() {
+      resetGame();
+      turnNameEl.textContent = players[currentPlayer];
+      player.style.background = ["dodgerblue","seagreen","purple","orange"][currentPlayer % 4];
+    }
+
+    function resetGame() {
+      obstacles.forEach(o => o.remove());
+      obstacles = [];
+      score = 0;
+      y = 0;
+      player.style.bottom = "0px";
+      speed = 5;
+      alive = true;
+      overlay.style.display = "none";
+      final.style.display = "none";
+      requestAnimationFrame(gameLoop);
+    }
+
+    function gameLoop() {
+      if (!alive) {
+        overlay.style.display = "flex";
+        return;
+      }
+
+      if (jump) { y += 5; if (y >= 100) jump = false; }
+      else { if (y > 0) y -= 5; }
+      player.style.bottom = y + "px";
+
+      if (Math.random() < 0.02) {
+        const obs = document.createElement("div");
+        obs.className = "obstacle";
+        obs.style.left = "700px";
+        game.appendChild(obs);
+        obstacles.push(obs);
+      }
+
+      obstacles.forEach((obs, i) => {
+        let x = parseInt(obs.style.left);
+        obs.style.left = (x - speed) + "px";
+
+        if (x < 80 && x > 50 && y < 40) {
+          alive = false;
+        }
+
+        if (x < -20) {
+          obs.remove();
+          obstacles.splice(i, 1);
+          score++;
+          currentScoreEl.textContent = score;
+        }
+      });
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    function showFinal() {
+      let maxScore = Math.max(...scores);
+      let winners = players.filter((p, i) => scores[i] === maxScore);
+      winnerEl.textContent = `🏆 Pemenang: ${winners.join(", ")} dengan skor ${maxScore}`;
+      overlay.style.display = "none";
+      final.style.display = "flex";
+    }
+  </script>
+</body>
+</html>
